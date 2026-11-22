@@ -35,8 +35,6 @@ def login_form():
                 st.session_state.user = {"username": username, "name": user["name"], "role": user["role"]}
                 st.rerun()
             st.error(t("login_bad"))
-    with mid:
-        st.caption(t("login_hint"))
 
 
 if "user" not in st.session_state:
