@@ -17,8 +17,12 @@ _SCRIPT = """
 <script>
 (function () {
   try {
-    var doc = window.parent.document, loc = window.parent.location;
-    var origin = loc.origin, base = origin + "/app/static/";
+    // On Streamlit Cloud the app runs in an iframe (same origin) inside a wrapper page, and the
+    // browser's "Install app" reads the wrapper's manifest. So the change goes to the top page too.
+    var loc = window.parent.location;
+    var origin = loc.origin, base = origin + loc.pathname.replace(/\\/$/, "") + "/app/static/";
+    var docs = [window.parent.document];
+    try { if (window.top.document !== docs[0]) docs.push(window.top.document); } catch (e) {}
     var cfg = %s;
     var manifest = {
       name: cfg.name + " - " + cfg.tagline, short_name: cfg.name, description: cfg.tagline,
@@ -32,22 +36,26 @@ _SCRIPT = """
     };
     var url = URL.createObjectURL(new Blob([JSON.stringify(manifest)], {type: "application/manifest+json"}));
 
-    function setLink(rel, href, extra) {
-      var els = doc.querySelectorAll('link[rel="' + rel + '"]');
-      var el = els[0] || doc.createElement("link");
-      el.setAttribute("rel", rel); el.setAttribute("href", href);
-      for (var k in (extra || {})) el.setAttribute(k, extra[k]);
-      if (!els[0]) doc.head.appendChild(el);
-    }
-    setLink("manifest", url);
-    setLink("icon", base + "hunika-192.png", {type: "image/png"});
-    setLink("apple-touch-icon", base + "hunika-192.png");
-    var theme = doc.querySelector('meta[name="theme-color"]') || doc.createElement("meta");
-    theme.setAttribute("name", "theme-color"); theme.setAttribute("content", "#1d6b52");
-    if (!theme.parentNode) doc.head.appendChild(theme);
-    var app = doc.querySelector('meta[name="application-name"]') || doc.createElement("meta");
-    app.setAttribute("name", "application-name"); app.setAttribute("content", cfg.name);
-    if (!app.parentNode) doc.head.appendChild(app);
+    docs.forEach(function (doc) {
+      function setLink(rel, href, extra) {
+        // Replace every existing link of this kind (Streamlit has several icon links).
+        doc.querySelectorAll('link[rel~="' + rel + '"]').forEach(function (old) { old.remove(); });
+        var el = doc.createElement("link");
+        el.setAttribute("rel", rel); el.setAttribute("href", href);
+        for (var k in (extra || {})) el.setAttribute(k, extra[k]);
+        doc.head.appendChild(el);
+      }
+      function setMeta(name, content) {
+        var el = doc.querySelector('meta[name="' + name + '"]') || doc.createElement("meta");
+        el.setAttribute("name", name); el.setAttribute("content", content);
+        if (!el.parentNode) doc.head.appendChild(el);
+      }
+      setLink("manifest", url);
+      setLink("icon", base + "hunika-192.png", {type: "image/png"});
+      setLink("apple-touch-icon", base + "hunika-192.png");
+      setMeta("theme-color", "#1d6b52");
+      setMeta("application-name", cfg.name);
+    });
   } catch (e) { console.warn("Hunika manifest not applied:", e); }
 })();
 </script>
