@@ -169,6 +169,26 @@ def save(con, row):
     con.execute("INSERT INTO readings VALUES (:store_id, :ts, :air_temp, :humidity, :grain_moisture, :grain_temp)", row)
 
 
+def seed_history_if_empty(hours: int = 96) -> bool:
+    """Create the starting history when the database has none (for example on a fresh deployment,
+    where readings.db is not in GitHub). Never touches existing readings. True when it created data."""
+    con = connect()
+    try:
+        if con.execute("SELECT COUNT(*) FROM readings").fetchone()[0] > 0:
+            return False
+        nodes = [VirtualNode(s, seed=i * 7 + 1) for i, s in enumerate(STORES)]
+        start = datetime.now().replace(minute=0, second=0, microsecond=0) - timedelta(hours=hours)
+        for h in range(hours):
+            for n in nodes:
+                row = n.step(start + timedelta(hours=h))
+                if row:
+                    save(con, row)
+        con.commit()
+        return True
+    finally:
+        con.close()
+
+
 def read_events():
     if not EVENTS_FILE.exists():
         return {}

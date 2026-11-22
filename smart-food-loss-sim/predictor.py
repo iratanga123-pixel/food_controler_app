@@ -28,7 +28,16 @@ def load_model():
     return _bundle
 
 
+_history_checked = False
+
+
 def load_readings(store_id: str, hours: int = 96) -> pd.DataFrame:
+    global _history_checked
+    if not _history_checked:
+        # Fresh install (no readings.db yet): build the starting history so the app has data.
+        from simulator import seed_history_if_empty
+        seed_history_if_empty()
+        _history_checked = True
     con = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query(
         "SELECT * FROM readings WHERE store_id = ? ORDER BY ts DESC LIMIT ?", con, params=(store_id, hours))
