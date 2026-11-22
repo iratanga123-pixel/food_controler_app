@@ -1,0 +1,9 @@
+[theme]
+primaryColor = "#1d6b52"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+# Serves the files in static/ at /app/static/ (used for the installable-app icons).
+enableStaticServing = true

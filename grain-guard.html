@@ -1,0 +1,369 @@
+<title>Smart Food Loss Prevention</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: operator console. Status strip on top, store list on the left, selected store detail on the right, pipeline explainer below. */
+:root{
+  --bg:#f2f5f1; --surface:#ffffff; --sunk:#e8eee9; --fg:#17231c; --muted:#5a6a60; --line:#d6e0d8;
+  --accent:#1d6b52; --accent-soft:#dcefe6; --fc:#8a5a14;
+  --ok:#2c7f4a; --ok-bg:#e1f2e6; --warn:#a86a12; --warn-bg:#fbefd9; --crit:#b8352a; --crit-bg:#fbe3e0;
+  --f-display:"Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0e1511; --surface:#16201a; --sunk:#1c2821; --fg:#e4ece6; --muted:#93a59a; --line:#2a3830;
+  --accent:#5fc29a; --accent-soft:#1c3a2e; --fc:#d9a45a;
+  --ok:#5cc27f; --ok-bg:#173324; --warn:#e3aa4c; --warn-bg:#3a2c14; --crit:#f07a6d; --crit-bg:#3d1c19; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0e1511; --surface:#16201a; --sunk:#1c2821; --fg:#e4ece6; --muted:#93a59a; --line:#2a3830;
+  --accent:#5fc29a; --accent-soft:#1c3a2e; --fc:#d9a45a;
+  --ok:#5cc27f; --ok-bg:#173324; --warn:#e3aa4c; --warn-bg:#3a2c14; --crit:#f07a6d; --crit-bg:#3d1c19; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));display:grid;gap:24px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(26px,4vw,36px);font-weight:700}
+h2{font-size:20px;font-weight:600}
+h3{font-size:15px;font-weight:600}
+p{margin:0}
+.mono,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.muted{color:var(--muted)}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
+header .lede{max-width:62ch;color:var(--muted);margin-top:6px}
+.sim-tag{font-size:12px;border:1px dashed var(--line);border-radius:6px;padding:6px 10px;color:var(--muted);max-width:340px}
+
+.strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.strip > div{background:var(--surface);padding:14px 16px;display:grid;gap:2px}
+.strip .big{font-family:var(--f-display);font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
+@media (max-width:760px){.strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.main{display:grid;grid-template-columns:320px minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.main{grid-template-columns:minmax(0,1fr)}}
+
+.stores{display:grid;gap:10px}
+.store{all:unset;box-sizing:border-box;cursor:pointer;display:grid;gap:8px;padding:14px 14px 12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;border-left:4px solid var(--sev,var(--line))}
+.store:hover{border-color:var(--accent);border-left-color:var(--sev)}
+.store:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.store[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);border-left-color:var(--sev)}
+.store .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.store .name{font-weight:600}
+.store .vals{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:13px}
+.store .vals span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.lv-ok{color:var(--ok);background:var(--ok-bg)} .lv-warn{color:var(--warn);background:var(--warn-bg)} .lv-crit{color:var(--crit);background:var(--crit-bg)}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;display:grid;gap:20px;min-width:0}
+.detail-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-start}
+.verdict{display:grid;grid-template-columns:auto minmax(0,1fr);gap:18px;align-items:center;padding:16px;border-radius:10px;background:var(--sunk)}
+.gauge{width:96px;height:96px}
+.verdict .days{font-family:var(--f-display);font-size:22px;font-weight:600}
+.verdict p + p{margin-top:4px}
+
+.charts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:1100px){.charts{grid-template-columns:minmax(0,1fr)}}
+.chart{display:grid;gap:4px;min-width:0}
+.chart .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.chart .cur{font-family:var(--f-mono);font-size:18px;font-weight:500}
+.chart svg{width:100%;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:18px;height:0;border-top:2px solid var(--accent);vertical-align:middle;margin-right:6px}
+.legend i.f{border-top:2px dashed var(--fc)} .legend i.l{border-top:1.5px dashed var(--crit)}
+
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+@media (max-width:700px){.two{grid-template-columns:minmax(0,1fr)}}
+.drivers{display:grid;gap:10px}
+.drv{display:grid;grid-template-columns:110px minmax(0,1fr) 54px;gap:10px;align-items:center;font-size:13px}
+.bar{height:8px;background:var(--sunk);border-radius:4px;overflow:hidden}
+.bar b{display:block;height:100%;background:var(--warn);border-radius:4px}
+.actions{margin:0;padding-left:18px;display:grid;gap:6px}
+
+.sim{display:grid;gap:14px;padding:16px;border:1px dashed var(--line);border-radius:10px}
+.sim .row{display:grid;grid-template-columns:130px minmax(0,1fr) 70px;gap:12px;align-items:center;font-size:14px}
+@media (max-width:500px){.sim .row{grid-template-columns:minmax(0,1fr) 64px}.sim .row label{grid-column:1/-1}}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.btn{font:inherit;font-size:13px;font-weight:600;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.alerts{display:grid;gap:12px}
+.sms{display:grid;gap:8px;padding:14px 16px;border-radius:10px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--sev)}
+.sms .meta{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.sms .msg{font-family:var(--f-mono);font-size:13px;background:var(--sunk);padding:10px 12px;border-radius:8px;white-space:pre-wrap;word-break:break-word}
+.sms .rw{font-family:var(--f-mono);font-size:13px;color:var(--muted);white-space:pre-wrap}
+.empty{color:var(--muted);padding:14px;border:1px dashed var(--line);border-radius:10px}
+
+.pipe{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;position:relative}
+.pipe > div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:6px;align-content:start;position:relative}
+.pipe > div:not(:last-child)::after{content:"→";position:absolute;right:-12px;top:50%;transform:translate(50%,-50%);color:var(--muted);font-size:16px;z-index:1}
+.pipe p{font-size:13px;color:var(--muted)}
+@media (max-width:800px){.pipe{grid-template-columns:minmax(0,1fr)}.pipe > div:not(:last-child)::after{content:"↓";right:50%;top:auto;bottom:-12px;transform:translate(50%,50%)}}
+.note{font-size:13px;color:var(--muted);max-width:80ch}
+@media (prefers-reduced-motion:no-preference){.gauge .arc{transition:stroke-dashoffset .4s ease}.bar b{transition:width .3s ease}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">AI + IoT · Post-harvest storage</div>
+      <h1>Smart Food Loss Prevention</h1>
+      <p class="lede">Sensors in each store report temperature, relative humidity and grain moisture every hour. The model estimates how long the grain can stay safe, projects the trend 72 hours ahead, and alerts the storage manager by SMS before the grain spoils.</p>
+    </div>
+    <p class="sim-tag">Prototype. The four stores and their readings are simulated examples, not live data. Use the controls under the charts to try other conditions.</p>
+  </header>
+
+  <section class="strip" aria-label="Summary">
+    <div><span class="eyebrow">Stores monitored</span><span class="big" id="sCount">4</span></div>
+    <div><span class="eyebrow">Need action</span><span class="big" id="sAction">–</span></div>
+    <div><span class="eyebrow">Grain at risk</span><span class="big" id="sTonnes">–</span></div>
+    <div><span class="eyebrow">Soonest predicted loss</span><span class="big" id="sNext" style="font-size:18px">–</span></div>
+  </section>
+
+  <div class="main">
+    <div class="stores" id="stores" role="group" aria-label="Storage sites"></div>
+
+    <section class="panel" id="detail" aria-live="polite">
+      <div class="detail-head">
+        <div>
+          <div class="eyebrow" id="dMeta"></div>
+          <h2 id="dName"></h2>
+        </div>
+        <span class="pill" id="dPill"></span>
+      </div>
+
+      <div class="verdict">
+        <svg class="gauge" viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="40" fill="none" stroke="var(--line)" stroke-width="10"></circle>
+          <circle class="arc" id="gArc" cx="50" cy="50" r="40" fill="none" stroke="var(--ok)" stroke-width="10" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="251.3" transform="rotate(-90 50 50)"></circle>
+          <text x="50" y="50" text-anchor="middle" dominant-baseline="central" fill="var(--fg)" font-family="IBM Plex Mono, monospace" font-size="22" font-weight="500" id="gTxt">0</text>
+          <text x="50" y="70" text-anchor="middle" fill="var(--muted)" font-size="9" font-family="IBM Plex Sans, sans-serif">risk / 100</text>
+        </svg>
+        <div>
+          <p class="eyebrow">Safe storage remaining</p>
+          <p class="days" id="vDays"></p>
+          <p class="muted" id="vFc"></p>
+        </div>
+      </div>
+
+      <div class="charts" id="charts"></div>
+      <div class="legend"><span><i></i>Last 48 h readings</span><span><i class="f"></i>72 h trend projection</span><span><i class="l"></i>Safe limit for this crop</span></div>
+
+      <div class="two">
+        <div class="drivers">
+          <h3>What is driving the risk</h3>
+          <div id="drivers"></div>
+          <p class="note">Each bar shows how many times the condition halves the safe storage time compared with ideal storage.</p>
+        </div>
+        <div>
+          <h3 style="margin-bottom:8px">Recommended actions</h3>
+          <ul class="actions" id="actions"></ul>
+        </div>
+      </div>
+
+      <div class="sim">
+        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+          <h3>Try other conditions</h3>
+          <button class="btn" id="reset" type="button">Reset to sensor readings</button>
+        </div>
+        <div class="row"><label for="inT">Temperature</label><input type="range" id="inT" min="10" max="40" step="0.5"><span class="num" id="oT"></span></div>
+        <div class="row"><label for="inRH">Relative humidity</label><input type="range" id="inRH" min="35" max="98" step="1"><span class="num" id="oRH"></span></div>
+        <div class="row"><label for="inM">Grain moisture</label><input type="range" id="inM" min="9" max="22" step="0.1"><span class="num" id="oM"></span></div>
+      </div>
+    </section>
+  </div>
+
+  <section style="display:grid;gap:12px">
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline">
+      <h2>Alerts sent to storage managers</h2>
+      <span class="muted" style="font-size:13px">SMS works on basic phones. Kinyarwanda text is a draft for a native speaker to check.</span>
+    </div>
+    <div class="alerts" id="alerts"></div>
+  </section>
+
+  <section style="display:grid;gap:12px">
+    <h2>How the system works</h2>
+    <div class="pipe">
+      <div><span class="eyebrow">In the store</span><h3>Sensor node</h3><p>Temperature and humidity sensor plus a capacitive moisture probe pushed into the grain, on a low-cost microcontroller with a battery or small solar panel.</p></div>
+      <div><span class="eyebrow">Connectivity</span><h3>Gateway</h3><p>Readings go out hourly over GSM, or over LoRa to a shared gateway where several cooperative stores sit close together.</p></div>
+      <div><span class="eyebrow">Cloud</span><h3>Prediction model</h3><p>Estimates safe storage days from crop, moisture, temperature and humidity, and projects the trend 72 hours ahead to warn early.</p></div>
+      <div><span class="eyebrow">People</span><h3>Alerts and dashboard</h3><p>SMS or USSD to the storage manager in Kinyarwanda or English, and this dashboard for the cooperative and extension officers.</p></div>
+    </div>
+    <p class="note">The scoring in this prototype is a rule-based stand-in for the trained model. It follows the common rule of thumb that safe storage time roughly halves for each 1% of moisture above the crop's safe level and for each 5–6 °C rise in temperature, with extra mould risk once air humidity passes about 70%. A production model would be trained on readings and loss records from real Rwandan stores.</p>
+  </section>
+</div>
+
+<script>
+(function(){
+  const CROPS = {
+    maize:   {label:"Maize",      rw:"ibigori",    mSafe:13.5, base:180},
+    rice:    {label:"Paddy rice", rw:"umuceri",    mSafe:14.0, base:180},
+    sorghum: {label:"Sorghum",    rw:"amasaka",    mSafe:13.0, base:200},
+    beans:   {label:"Dry beans",  rw:"ibishyimbo", mSafe:14.0, base:240}
+  };
+  // Example stores. slope = change per hour over the last two days.
+  const STORES = [
+    {id:"nyg", name:"Nyagatare Maize Store",   district:"Nyagatare", province:"Eastern",  crop:"maize",   tonnes:42, now:{T:26.0,RH:79,m:15.0}, slope:{T:0.00,RH:0.06,m:0.022}},
+    {id:"rwm", name:"Rwamagana Rice Store",    district:"Rwamagana", province:"Eastern",  crop:"rice",    tonnes:65, now:{T:27.0,RH:84,m:17.2}, slope:{T:0.01,RH:0.04,m:0.030}},
+    {id:"bgs", name:"Bugesera Sorghum Store",  district:"Bugesera",  province:"Eastern",  crop:"sorghum", tonnes:18, now:{T:31.0,RH:58,m:13.1}, slope:{T:0.03,RH:-0.03,m:0.000}},
+    {id:"msz", name:"Musanze Bean Store",      district:"Musanze",   province:"Northern", crop:"beans",   tonnes:24, now:{T:18.0,RH:63,m:12.6}, slope:{T:0.00,RH:0.01,m:0.002}}
+  ];
+  const LIM = {T:[5,45], RH:[30,100], m:[8,25]};
+  const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+
+  // Seeded noise so the example history is the same on every load.
+  function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+  const nowHour = new Date().getHours();
+  STORES.forEach((s,i)=>{
+    const r=rng(17+i*101); s.hist={T:[],RH:[],m:[]};
+    for(let h=-47;h<=0;h++){
+      const hod=((nowHour+h)%24+24)%24, cyc=Math.cos(2*Math.PI*(hod-14)/24);
+      const tCyc=3*cyc, rhCyc=-7*cyc;
+      const tNow=3*Math.cos(2*Math.PI*(nowHour-14)/24), rhNow=-7*Math.cos(2*Math.PI*(nowHour-14)/24);
+      s.hist.T.push(s.now.T + s.slope.T*h + tCyc - tNow + (r()-.5)*0.8);
+      s.hist.RH.push(s.now.RH + s.slope.RH*h + rhCyc - rhNow + (r()-.5)*2);
+      s.hist.m.push(s.now.m + s.slope.m*h + (r()-.5)*0.08);
+    }
+    ["T","RH","m"].forEach(k=>{s.hist[k][47]=s.now[k];});
+    s.reg={}; ["T","RH","m"].forEach(k=>{s.reg[k]=regress(s.hist[k]);});
+    s.cur={...s.now};
+  });
+  function regress(y){const n=y.length;let sx=0,sy=0,sxy=0,sxx=0;y.forEach((v,i)=>{sx+=i;sy+=v;sxy+=i*v;sxx+=i*i});return (n*sxy-sx*sy)/(n*sxx-sx*sx);}
+
+  // Safe storage days: halves per 1% moisture over safe level, per 6 °C over 22 °C, per 7.5% RH over 70%.
+  function halvings(crop,c){
+    return { m:(c.m-CROPS[crop].mSafe), T:(c.T-22)/6, RH:Math.max(0,(c.RH-70)/7.5) };
+  }
+  function safeDays(crop,c){const h=halvings(crop,c);return clamp(CROPS[crop].base*Math.pow(.5,h.m+h.T+h.RH),0.5,365);}
+  function score(d){return Math.round(clamp(100*(Math.log(180)-Math.log(d))/(Math.log(180)-Math.log(3)),0,100));}
+  function level(d){return d<=10?"crit":d<=45?"warn":"ok";}
+  const LV={ok:"Good",warn:"Watch",crit:"Act now"}, SEV={ok:"var(--ok)",warn:"var(--warn)",crit:"var(--crit)"};
+  function project(s){const p={};["T","RH","m"].forEach(k=>{p[k]=clamp(s.cur[k]+s.reg[k]*72,LIM[k][0],LIM[k][1])});return p;}
+  function assess(s){
+    const dNow=safeDays(s.crop,s.cur), fc=project(s), dFc=safeDays(s.crop,fc), worst=Math.min(dNow,dFc);
+    return {dNow,dFc,fc,worst,score:score(worst),level:level(worst)};
+  }
+  const fmtDays=d=>d>=365?"over a year":d<1?"under 1 day":Math.round(d)+(Math.round(d)===1?" day":" days");
+
+  let sel="nyg";
+  const $=id=>document.getElementById(id);
+
+  function renderStores(){
+    $("stores").innerHTML=STORES.map(s=>{const a=assess(s);return `
+      <button class="store" type="button" data-id="${s.id}" aria-pressed="${s.id===sel}" style="--sev:${SEV[a.level]}">
+        <div class="top"><span class="name">${s.name}</span><span class="pill lv-${a.level}">${LV[a.level]}</span></div>
+        <div class="muted" style="font-size:13px">${CROPS[s.crop].label} · ${s.tonnes} t · ${s.district}</div>
+        <div class="vals num"><div><span>Temp</span>${s.cur.T.toFixed(1)} °C</div><div><span>RH</span>${Math.round(s.cur.RH)}%</div><div><span>Moisture</span>${s.cur.m.toFixed(1)}%</div></div>
+      </button>`}).join("");
+    $("stores").querySelectorAll(".store").forEach(b=>b.addEventListener("click",()=>{sel=b.dataset.id;renderAll();}));
+  }
+
+  function chart(title,unit,dec,hist,cur,fcv,limit,limitLabel){
+    const W=400,H=120,L=38,R=6,T=8,B=20,hx=3,x0=L,xNow=L+47*hx,xEnd=W-R,fx=(xEnd-xNow)/72;
+    const vals=[...hist,cur,fcv].concat(limit!=null?[limit]:[]);
+    let lo=Math.min(...vals),hi=Math.max(...vals);const pad=(hi-lo)*0.15||1;lo-=pad;hi+=pad;
+    const y=v=>T+(H-T-B)*(1-(v-lo)/(hi-lo));
+    const pts=hist.map((v,i)=>[x0+i*hx,y(i===47?cur:v)]);
+    const d=pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ");
+    const area=d+` L${xNow} ${H-B} L${x0} ${H-B} Z`;
+    const lim=limit!=null?`<line x1="${L}" x2="${xEnd}" y1="${y(limit)}" y2="${y(limit)}" stroke="var(--crit)" stroke-width="1.2" stroke-dasharray="4 3"/><text x="${xEnd}" y="${y(limit)-4}" text-anchor="end" font-size="10" fill="var(--crit)" font-family="IBM Plex Sans, sans-serif">${limitLabel}</text>`:"";
+    const f=v=>v.toFixed(dec);
+    return `<div class="chart"><div class="hd"><span class="eyebrow">${title}</span><span class="cur">${f(cur)}${unit}</span></div>
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}: now ${f(cur)}${unit}, projected ${f(fcv)}${unit} in 72 hours">
+        <line x1="${L}" x2="${xEnd}" y1="${y(hi-pad)}" y2="${y(hi-pad)}" stroke="var(--line)" stroke-width="1"/>
+        <line x1="${L}" x2="${xEnd}" y1="${y(lo+pad)}" y2="${y(lo+pad)}" stroke="var(--line)" stroke-width="1"/>
+        <text x="${L-6}" y="${y(hi-pad)+3}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${f(hi-pad)}</text>
+        <text x="${L-6}" y="${y(lo+pad)+3}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${f(lo+pad)}</text>
+        <line x1="${xNow}" x2="${xNow}" y1="${T}" y2="${H-B}" stroke="var(--line)" stroke-width="1"/>
+        ${lim}
+        <path d="${area}" fill="var(--accent)" fill-opacity=".1" stroke="none"/>
+        <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linejoin="round"/>
+        <line x1="${xNow}" y1="${y(cur)}" x2="${xEnd}" y2="${y(fcv)}" stroke="var(--fc)" stroke-width="1.8" stroke-dasharray="5 4"/>
+        <circle cx="${xEnd-2}" cy="${y(fcv)}" r="3" fill="var(--fc)"/>
+        <circle cx="${xNow}" cy="${y(cur)}" r="4" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>
+        <text x="${x0}" y="${H-5}" font-size="10" fill="var(--muted)" font-family="IBM Plex Sans, sans-serif">−48 h</text>
+        <text x="${xNow}" y="${H-5}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="IBM Plex Sans, sans-serif">now</text>
+        <text x="${xEnd}" y="${H-5}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="IBM Plex Sans, sans-serif">+72 h</text>
+      </svg></div>`;
+  }
+
+  function actionsFor(s,a){
+    const c=CROPS[s.crop], h=halvings(s.crop,a.fc), hn=halvings(s.crop,s.cur), out=[];
+    if(a.level==="crit") out.push(`Inspect the bags today. Move the wettest or warmest lots out first and check for mould, heating or a sour smell.`);
+    if(Math.max(hn.m,h.m)>0) out.push(`Dry the ${c.label.toLowerCase()} to ${c.mSafe}% moisture or below before storing further: sun-dry on tarpaulins or use the cooperative's dryer.`);
+    if(Math.max(hn.RH,h.RH)>0) out.push(`Bring humidity below 70%: open vents on dry, sunny hours and close them during rain. Keep bags on pallets, 30 cm from the walls.`);
+    if(Math.max(hn.T,h.T)>0.5) out.push(`Lower the temperature: shade the roof, ventilate at night when the air is cooler, and check for weevils, which multiply faster in heat.`);
+    if(a.level==="crit") out.push(`If drying is not possible soon, plan to sell or process this lot first.`);
+    if(!out.length) out.push(`Conditions are within safe limits. Keep weekly checks and hermetic bags sealed.`);
+    return out;
+  }
+
+  function renderDetail(){
+    const s=STORES.find(x=>x.id===sel), a=assess(s), c=CROPS[s.crop];
+    $("dMeta").textContent=`${s.district} District, ${s.province} Province · ${c.label} · ${s.tonnes} tonnes`;
+    $("dName").textContent=s.name;
+    const p=$("dPill"); p.className="pill lv-"+a.level; p.textContent=LV[a.level];
+    $("gArc").style.strokeDashoffset=(251.3*(1-a.score/100)).toFixed(1);
+    $("gArc").setAttribute("stroke",SEV[a.level]); $("gTxt").textContent=a.score;
+    $("vDays").textContent=`About ${fmtDays(a.dNow)} at today's conditions`;
+    const trendWorse=a.dFc<a.dNow*0.85;
+    $("vFc").textContent=trendWorse
+      ? `If the current trend continues, that drops to ${fmtDays(a.dFc)} within 72 hours. The alert level uses this projection.`
+      : `The 72-hour trend is stable or improving (${fmtDays(a.dFc)} projected).`;
+    $("charts").innerHTML=
+      chart("Grain moisture","%",1,s.hist.m,s.cur.m,a.fc.m,c.mSafe,`safe ≤ ${c.mSafe}%`)+
+      chart("Relative humidity","%",0,s.hist.RH,s.cur.RH,a.fc.RH,70,"mould risk > 70%")+
+      chart("Temperature"," °C",1,s.hist.T,s.cur.T,a.fc.T,null,"");
+    const h=halvings(s.crop,a.worst===a.dFc?a.fc:s.cur);
+    const rows=[["Grain moisture",h.m],["Humidity",h.RH],["Temperature",h.T]];
+    $("drivers").innerHTML=rows.map(([n,v])=>{const w=clamp(v,0,4)/4*100;return `<div class="drv"><span>${n}</span><div class="bar"><b style="width:${w}%;background:${v>2?"var(--crit)":v>0.5?"var(--warn)":"var(--ok)"}"></b></div><span class="num muted">${v>0?"×"+Math.pow(2,v).toFixed(1):"ok"}</span></div>`}).join("");
+    $("actions").innerHTML=actionsFor(s,a).map(t=>`<li>${t}</li>`).join("");
+    [["T","oT",v=>v.toFixed(1)+" °C"],["RH","oRH",v=>Math.round(v)+"%"],["m","oM",v=>v.toFixed(1)+"%"]].forEach(([k,o,f])=>{$("in"+k).value=s.cur[k];$(o).textContent=f(s.cur[k]);});
+  }
+
+  function smsFor(s,a){
+    const c=CROPS[s.crop], tag=a.level==="crit"?"URGENT":"WARNING", hn=halvings(s.crop,a.fc);
+    const main = hn.m>=hn.RH && hn.m>=hn.T ? `grain moisture ${s.cur.m.toFixed(1)}% (safe ≤${c.mSafe}%)`
+               : hn.RH>=hn.T ? `air humidity ${Math.round(s.cur.RH)}% (keep <70%)` : `temperature ${s.cur.T.toFixed(1)}°C`;
+    const en=`SFLP ${tag}: ${s.name}, ${main}. Safe storage about ${fmtDays(a.dNow)}, ${fmtDays(a.dFc)} if trend continues. Dry grain to ${c.mSafe}% and ventilate. Reply 1 when checked.`;
+    const rw=`IBURIRA: Ububiko bwa ${s.district}, ubuhehere bw'${c.rw} ni ${s.cur.m.toFixed(1)}%. Mwanike neza kugeza munsi ya ${c.mSafe}%.`;
+    return {en,rw};
+  }
+  function renderAlerts(){
+    const list=STORES.map(s=>({s,a:assess(s)})).filter(x=>x.a.level!=="ok").sort((p,q)=>q.a.score-p.a.score);
+    $("alerts").innerHTML=list.length?list.map(({s,a})=>{const m=smsFor(s,a);return `
+      <div class="sms" style="--sev:${SEV[a.level]}">
+        <div class="meta"><span><b style="color:var(--fg)">${s.name}</b> · to storage manager</span><span class="pill lv-${a.level}">${LV[a.level]} · risk ${a.score}</span></div>
+        <div class="msg">${m.en}</div>
+        <div class="rw">${m.rw}</div>
+        <div><button class="btn copy" type="button" data-t="${encodeURIComponent(m.en+"\n"+m.rw)}">Copy SMS text</button></div>
+      </div>`}).join(""):`<p class="empty">No alerts. All four stores are within safe limits.</p>`;
+    $("alerts").querySelectorAll(".copy").forEach(b=>b.addEventListener("click",()=>{
+      const t=decodeURIComponent(b.dataset.t);
+      const done=()=>{b.textContent="Copied";setTimeout(()=>b.textContent="Copy SMS text",1500)};
+      try{navigator.clipboard.writeText(t).then(done,()=>selectMsg(b));}catch(e){selectMsg(b);}
+    }));
+  }
+  function selectMsg(b){const el=b.closest(".sms").querySelector(".msg");const r=document.createRange();r.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent="Selected, press Ctrl+C";}
+
+  function renderStrip(){
+    const all=STORES.map(s=>({s,a:assess(s)}));
+    const act=all.filter(x=>x.a.level!=="ok");
+    $("sAction").textContent=act.length;
+    $("sTonnes").textContent=act.reduce((t,x)=>t+x.s.tonnes,0)+" t";
+    const soon=all.slice().sort((p,q)=>p.a.worst-q.a.worst)[0];
+    $("sNext").textContent=`${soon.s.district}, ${fmtDays(soon.a.worst)}`;
+  }
+  function renderAll(){renderStrip();renderStores();renderDetail();renderAlerts();}
+
+  ["T","RH","m"].forEach(k=>$("in"+k).addEventListener("input",e=>{
+    const s=STORES.find(x=>x.id===sel); s.cur[k]=parseFloat(e.target.value); renderAll();
+  }));
+  $("reset").addEventListener("click",()=>{const s=STORES.find(x=>x.id===sel);s.cur={...s.now};renderAll();});
+  renderAll();
+})();
+</script>

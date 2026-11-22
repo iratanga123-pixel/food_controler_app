@@ -1,0 +1,20 @@
+# Python cache
+__pycache__/
+*.pyc
+.venv/
+
+# Runtime data: recreated when you run the simulator and dashboard
+data/*.db
+data/alert_state.json
+data/events.json
+data/sim_status.json
+data/sms_outbox.log
+data/commands/
+
+# Kept on purpose so the project runs right after cloning:
+#   data/spoilage_model.joblib  (trained AI model, ~19 MB)
+#   data/training_data.csv      (training examples)
+
+# Secrets and editor settings
+.env
+.streamlit/secrets.toml

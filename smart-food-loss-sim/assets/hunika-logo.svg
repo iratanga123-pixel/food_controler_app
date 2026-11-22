@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Hunika logo">
+  <rect width="256" height="256" rx="56" fill="#1d6b52"/>
+  <!-- shield -->
+  <path d="M128 36 L204 64 V126 C204 170 172 202 128 222 C84 202 52 170 52 126 V64 Z" fill="#f4faf6"/>
+  <!-- grain stalk -->
+  <path d="M128 196 V92" stroke="#1d6b52" stroke-width="9" stroke-linecap="round" fill="none"/>
+  <g fill="#1d6b52">
+    <ellipse cx="128" cy="78" rx="11" ry="20"/>
+    <ellipse cx="107" cy="100" rx="9" ry="18" transform="rotate(-38 107 100)"/>
+    <ellipse cx="149" cy="100" rx="9" ry="18" transform="rotate(38 149 100)"/>
+    <ellipse cx="108" cy="130" rx="9" ry="18" transform="rotate(-38 108 130)"/>
+    <ellipse cx="148" cy="130" rx="9" ry="18" transform="rotate(38 148 130)"/>
+    <ellipse cx="110" cy="160" rx="9" ry="17" transform="rotate(-38 110 160)"/>
+    <ellipse cx="146" cy="160" rx="9" ry="17" transform="rotate(38 146 160)"/>
+  </g>
+</svg>
