@@ -4,8 +4,8 @@
     {
       "name": "dashboard",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "streamlit", "run", "smart-food-loss-sim/dashboard.py", "--server.headless", "true", "--server.port", "8501"],
-      "port": 8501
+      "runtimeArgs": ["-m", "streamlit", "run", "smart-food-loss-sim/dashboard.py", "--server.headless", "true", "--server.port", "8611"],
+      "port": 8611
     }
   ]
 }

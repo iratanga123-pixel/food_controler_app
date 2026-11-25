@@ -433,7 +433,7 @@ _TOOLBAR_CSS = """
 /* Pin the language button into Streamlit's top bar, right next to the ⋮ menu
    (where the Light / Dark theme setting lives). */
 .st-key-lang_toolbar {
-    position: fixed; top: 0.6rem; right: 3.6rem;
+    position: fixed; top: 0.6rem; right: 5.5rem;
     z-index: 999991; width: auto !important;
 }
 .st-key-lang_toolbar button { padding: 0.1rem 0.6rem; min-height: 2rem; }
